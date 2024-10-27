@@ -1,11 +1,30 @@
-use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::{Uint128, Addr};
+use serde::{Deserialize, Serialize};
+use schemars::JsonSchema;
 
-#[cw_serde]
-pub struct InstantiateMsg {}
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct InstantiateMsg {
+    pub owner: Addr,
+    
+    pub payment_token: Addr,
+}
 
-#[cw_serde]
-pub enum ExecuteMsg {}
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecuteMsg {
+    ListToken { token_id: String, price: Uint128, quantity: Uint128 },
+    
+    RemoveListing { token_id: String },
+    
+    BuyToken { token_id: String, quantity: Uint128 },
+}
 
-#[cw_serde]
-#[derive(QueryResponses)]
-pub enum QueryMsg {}
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    GetListing { token_id: String },
+    
+    GetListingsByOwner { owner: String },
+    
+    GetAllListings {},
+}
