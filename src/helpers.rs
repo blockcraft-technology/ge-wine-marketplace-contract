@@ -1,27 +1,46 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_std::{Addr, Deps, DepsMut, MessageInfo, Response, StdResult, Uint128};
+use crate::state::{LISTINGS, Listing};
+use crate::error::ContractError;
 
-use cosmwasm_std::{to_json_binary, Addr, CosmosMsg, StdResult, WasmMsg};
+pub fn validate_owner(sender: &Addr, owner: &Addr) -> Result<(), ContractError> {
+    if sender != owner {
+        return Err(ContractError::Unauthorized {});
+    }
+    Ok(())
+}
 
-use crate::msg::ExecuteMsg;
+pub fn update_listing_balance(
+    deps: &DepsMut, 
+    info: MessageInfo,
+    token_id: String,
+    quantity: Uint128,
+) -> StdResult<Listing> {
+    let current_listing = LISTINGS.may_load(deps.storage, token_id.clone())?.unwrap_or_default();
+    let new_listing = Listing {
+        token_id,
+        seller: info.sender.clone(),
+        price: current_listing.price,
+        quantity: current_listing.quantity + quantity,
+    };
+    Ok(new_listing)
+}
 
-/// CwTemplateContract is a wrapper around Addr that provides a lot of helpers
-/// for working with this.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct CwTemplateContract(pub Addr);
-
-impl CwTemplateContract {
-    pub fn addr(&self) -> Addr {
-        self.0.clone()
+pub fn process_purchase(
+    deps: DepsMut,
+    info: MessageInfo,
+    mut listing: Listing,
+    quantity: Uint128,
+) -> Result<Response, ContractError> {
+    if listing.quantity < quantity {
+        return Err(ContractError::InsufficientQuantity {});
     }
 
-    pub fn call<T: Into<ExecuteMsg>>(&self, msg: T) -> StdResult<CosmosMsg> {
-        let msg = to_json_binary(&msg.into())?;
-        Ok(WasmMsg::Execute {
-            contract_addr: self.addr().into(),
-            msg,
-            funds: vec![],
-        }
-        .into())
-    }
+    listing.quantity -= quantity;
+    LISTINGS.save(deps.storage, listing.token_id.clone(), &listing)?;
+
+    Ok(Response::new()
+        .add_attribute("action", "purchase")
+        .add_attribute("buyer", info.sender)
+        .add_attribute("token_id", listing.token_id)
+        .add_attribute("quantity", quantity.to_string()))
 }
